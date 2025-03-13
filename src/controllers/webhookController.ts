@@ -13,6 +13,10 @@ export const verifyWebhook = (req: Request, res: Response): void => {
         const token = req.query['hub.verify_token'];
         const challenge = req.query['hub.challenge'];
 
+        // Enhanced logging for debugging
+        logger.info(`Webhook verification request received: mode=${mode}, token=${token}, challenge=${challenge}`);
+        logger.info(`Expected token: ${config.meta.verifyToken}`);
+
         // Check if a token and mode is in the query string of the request
         if (mode && token) {
             // Check the mode and token sent are correct
@@ -22,7 +26,7 @@ export const verifyWebhook = (req: Request, res: Response): void => {
                 res.status(200).send(challenge);
             } else {
                 // Respond with '403 Forbidden' if verify tokens do not match
-                logger.warn('Webhook verification failed - invalid token');
+                logger.warn(`Webhook verification failed - invalid token. Got: ${token}, Expected: ${config.meta.verifyToken}`);
                 res.sendStatus(403);
             }
         } else {
@@ -38,26 +42,40 @@ export const verifyWebhook = (req: Request, res: Response): void => {
 // Process incoming webhook events
 export const processWebhook = async (req: Request, res: Response): Promise<void> => {
     try {
+        // Log the incoming webhook payload for debugging
+        logger.info(`Received webhook payload: ${JSON.stringify(req.body)}`);
+
         const payload = req.body as WebhookPayload;
 
         // Return a '200 OK' response to all requests
         res.status(200).send('EVENT_RECEIVED');
 
+        // Log available usernames and pages for debugging
+        logger.info(`Available Business IG Usernames: ${JSON.stringify(config.meta.businessIgUsernames)}`);
+        logger.info(`Available Pages: ${JSON.stringify(config.meta.pages.map(p => ({ id: p.id, name: p.name })))}`);
+
         // Process the entries
         if (payload.object === 'page' || payload.object === 'instagram') {
+            logger.info(`Processing ${payload.object} webhook with ${payload.entry?.length || 0} entries`);
+
             for (const entry of payload.entry) {
                 let mentionData: MentionData | null = null;
 
                 // Process based on the platform
                 if (payload.object === 'page') {
+                    logger.info(`Processing Facebook entry: ${JSON.stringify(entry)}`);
                     mentionData = await processFacebookWebhook(entry);
                 } else if (payload.object === 'instagram') {
+                    logger.info(`Processing Instagram entry: ${JSON.stringify(entry)}`);
                     mentionData = await processInstagramWebhook(entry);
                 }
 
                 // If we found a mention, send notifications
                 if (mentionData) {
+                    logger.info(`Mention detected: ${JSON.stringify(mentionData)}`);
                     await sendAllNotifications(mentionData);
+                } else {
+                    logger.info('No mention found in this entry');
                 }
             }
         } else {

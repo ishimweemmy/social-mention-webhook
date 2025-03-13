@@ -24,6 +24,15 @@ app.get('/health', (req, res) => {
     res.status(200).json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
+// Test endpoint for verifying configuration
+app.get('/test-config', (req, res) => {
+    res.status(200).json({
+        verifyToken: config.meta.verifyToken,
+        environment: config.server.environment,
+        serverRunning: true
+    });
+});
+
 // Default route
 app.get('/', (req, res) => {
     res.status(200).json({

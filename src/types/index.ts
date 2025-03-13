@@ -20,13 +20,14 @@ export interface MentionData {
     platform: 'facebook' | 'instagram';
     postId: string;
     postUrl?: string;
-    postContent?: string;  // Added to store the content of the original post
+    postContent?: string;  // Store the content of the original post
     commentId: string;
     commentText: string;
     taggerId: string;
     taggerName?: string;
     taggerUsername?: string;
-    taggerProfilePicUrl?: string;  // Added to store profile picture if available
+    taggerProfilePicUrl?: string;  // Store profile picture if available
+    mentionedUsername?: string;    // Which username was mentioned
     timestamp: number;
 }
 

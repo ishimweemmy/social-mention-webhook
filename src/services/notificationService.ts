@@ -38,6 +38,7 @@ export const sendEmailNotification = async (
         <li><strong>User ID:</strong> ${mentionData.taggerId}</li>
         ${mentionData.taggerName ? `<li><strong>Name:</strong> ${mentionData.taggerName}</li>` : ''}
         ${mentionData.taggerUsername ? `<li><strong>Username:</strong> @${mentionData.taggerUsername}</li>` : ''}
+        ${mentionData.taggerProfilePicUrl ? `<li><strong>Profile Picture:</strong> <a href="${mentionData.taggerProfilePicUrl}" target="_blank">View</a></li>` : ''}
       </ul>
       
       ${notification.url ? `<p><a href="${notification.url}">View the post</a></p>` : ''}
@@ -61,10 +62,11 @@ export const sendEmailNotification = async (
 const formatEmailNotification = (mentionData: MentionData): NotificationContent => {
     const taggerName = mentionData.taggerName || mentionData.taggerUsername || 'Someone';
     const platformName = mentionData.platform.charAt(0).toUpperCase() + mentionData.platform.slice(1);
+    const mentionedUsername = mentionData.mentionedUsername || 'your business';
 
     return {
         title: `New ${platformName} Mention Alert!`,
-        body: `${taggerName} mentioned your business (@${config.meta.businessIgUsername}) in a comment:\n\n"${mentionData.commentText}"`,
+        body: `${taggerName} mentioned @${mentionedUsername} in a comment:\n\n"${mentionData.commentText}"`,
         url: mentionData.postUrl,
     };
 };

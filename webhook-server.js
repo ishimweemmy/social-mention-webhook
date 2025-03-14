@@ -400,26 +400,46 @@ async function sendMentionEmail(mentionInfo) {
         // Create email subject
         const subject = `New ${platform} ${mentionType} mention for ${mentionInfo.mentionedUsername || 'your account'}`;
 
-        // Create email HTML content
-        const htmlContent = `
-      <h2>You were mentioned on ${platform}</h2>
-      <p><strong>Time:</strong> ${new Date(mentionInfo.postCreatedTime || mentionInfo.timestamp).toLocaleString()}</p>
-      <p><strong>By User:</strong> ${mentionInfo.fromUser}</p>
-      <p><strong>Type:</strong> ${mentionType.charAt(0).toUpperCase() + mentionType.slice(1)}</p>
-      <p><strong>Content:</strong> ${mentionInfo.postMessage}</p>
-      ${mentionInfo.mediaType !== 'none' ? `<p><strong>Media Type:</strong> ${mentionInfo.mediaType}</p>` : ''}
-      <p><strong>Link:</strong> <a href="${mentionInfo.postUrl}">${mentionInfo.postUrl}</a></p>
-      
-      <hr>
-      <p><em>This is an automated notification from your social media webhook monitor.</em></p>
-    `;
+        // Create image preview section if media exists
+        let mediaSection = '';
+        if (mentionInfo.mediaUrl && mentionInfo.mediaType && mentionInfo.mediaType !== 'none') {
+            mediaSection = `
+        <div style="margin: 20px 0; padding: 10px; border: 1px solid #ddd; border-radius: 5px; background-color: #f9f9f9;">
+          <h3>Media Content:</h3>
+          <p><strong>Type:</strong> ${mentionInfo.mediaType}</p>
+          <p><strong>Media Link:</strong> <a href="${mentionInfo.mediaUrl}" target="_blank">View Media</a></p>
+        </div>
+      `;
+        }
 
-        // Log the email we're about to send
-        console.log(`Preparing to send email notification:
-      Subject: ${subject}
-      To: ${process.env.EMAIL_TO}
-      From: ${process.env.EMAIL_FROM}
-    `);
+        // Create email HTML content with more detailed formatting
+        const htmlContent = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 5px;">
+        <h2 style="color: #3b5998; border-bottom: 1px solid #eee; padding-bottom: 10px;">You were mentioned on ${platform}</h2>
+        
+        <div style="margin: 20px 0;">
+          <p><strong>Time:</strong> ${new Date(mentionInfo.postCreatedTime || mentionInfo.timestamp).toLocaleString()}</p>
+          <p><strong>By User:</strong> ${mentionInfo.fromUser}</p>
+          <p><strong>Mention Type:</strong> ${mentionType.charAt(0).toUpperCase() + mentionType.slice(1)}</p>
+        </div>
+        
+        <div style="margin: 20px 0; padding: 15px; background-color: #f0f2f5; border-radius: 5px;">
+          <h3>Content:</h3>
+          <p style="white-space: pre-wrap;">${mentionInfo.postMessage || 'No caption/text'}</p>
+        </div>
+        
+        ${mediaSection}
+        
+        <div style="margin: 20px 0;">
+          <a href="${mentionInfo.postUrl}" style="background-color: #3b5998; color: white; padding: 10px 15px; text-decoration: none; border-radius: 4px; display: inline-block;">
+            View Original Post
+          </a>
+        </div>
+        
+        <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
+        <p style="color: #777; font-size: 12px;"><em>This is an automated notification from your social media webhook monitor.</em></p>
+      </div>
+    `;
 
         // Send email
         const mailOptions = {

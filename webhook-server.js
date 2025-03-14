@@ -198,37 +198,85 @@ async function handleMention(data, platform) {
             // Send email notification
             await sendMentionEmail(mentionInfo);
         } else if (platform === 'instagram') {
-            // Safely extract data, with null checks
+            // For Instagram, we need to:
+            // 1. Determine which account was mentioned (which is not in the webhook payload)
+            // 2. Get the details of the post/comment where the mention occurred
+
+            // Safely extract data
             mentionInfo.mediaId = data.media_id;
+            mentionInfo.commentId = data.comment_id;
 
-            // FIXED: Added null check for mentioned_username
-            const mentionedUsername = data.mentioned_username;
-            mentionInfo.mentionedUsername = mentionedUsername;
+            // Since Instagram doesn't tell us which account was mentioned,
+            // we have two options:
+            // A) If we have only one account configured, assume it's that one
+            // B) If we have multiple accounts, try to fetch the comment text and detect which account was mentioned
 
-            if (!mentionedUsername) {
-                console.warn('No mentioned_username in Instagram webhook data. Using fallback approach.');
-                // Try to use a fallback approach or skip
-                if (Object.keys(instagramAccounts).length === 1) {
-                    // If we only have one Instagram account configured, use that
-                    mentionInfo.mentionedUsername = Object.keys(instagramAccounts)[0];
-                    console.log(`Using default Instagram account: ${mentionInfo.mentionedUsername}`);
-                } else {
-                    // Log the issue and continue without sending email
-                    console.error('Cannot determine which Instagram account was mentioned. Accounts configured:',
-                        Object.keys(instagramAccounts));
+            let accountInfo = null;
+
+            if (Object.keys(instagramAccounts).length === 1) {
+                // Option A: Only one account configured
+                const accountKey = Object.keys(instagramAccounts)[0];
+                accountInfo = instagramAccounts[accountKey];
+                mentionInfo.mentionedUsername = accountKey;
+                console.log(`Using default Instagram account: ${accountKey}`);
+            } else {
+                // Option B: Multiple accounts configured
+                // First, try to get a valid token from any account to fetch the comment
+                const firstAccountKey = Object.keys(instagramAccounts)[0];
+                const tempToken = instagramAccounts[firstAccountKey]?.token;
+
+                if (!tempToken) {
+                    console.error('No valid token found for any Instagram account');
                     return; // Skip this mention
+                }
+
+                // Fetch the comment to see which account was mentioned
+                try {
+                    // If we have a comment_id, fetch the comment
+                    if (mentionInfo.commentId) {
+                        const commentDetails = await getInstagramCommentDetails(mentionInfo.commentId, tempToken);
+
+                        // Check which account was mentioned in the comment text
+                        const commentText = commentDetails.text || '';
+                        console.log(`Comment text: ${commentText}`);
+
+                        // Look for @username mentions in the comment
+                        let mentionedAccount = null;
+                        for (const username of Object.keys(instagramAccounts)) {
+                            if (commentText.toLowerCase().includes(`@${username.toLowerCase()}`)) {
+                                mentionedAccount = username;
+                                break;
+                            }
+                        }
+
+                        if (mentionedAccount) {
+                            accountInfo = instagramAccounts[mentionedAccount.toLowerCase()];
+                            mentionInfo.mentionedUsername = mentionedAccount;
+                            console.log(`Detected mention of account: ${mentionedAccount}`);
+                        } else {
+                            console.log('No known account mentioned in comment text');
+                        }
+                    }
+                } catch (commentError) {
+                    console.error('Error fetching comment details:', commentError);
+                }
+
+                // If we still don't know which account was mentioned, use the first one as fallback
+                if (!accountInfo) {
+                    const fallbackAccount = Object.keys(instagramAccounts)[0];
+                    accountInfo = instagramAccounts[fallbackAccount];
+                    mentionInfo.mentionedUsername = fallbackAccount;
+                    console.log(`Using fallback Instagram account: ${fallbackAccount}`);
                 }
             }
 
-            // Look up the Instagram account to get the page token (safely)
-            const accountInfo = instagramAccounts[mentionInfo.mentionedUsername?.toLowerCase()];
             if (!accountInfo) {
-                console.error(`No configuration found for Instagram account ${mentionInfo.mentionedUsername}`);
+                console.error('Could not determine Instagram account configuration');
                 console.log('Available accounts:', Object.keys(instagramAccounts));
                 return; // Skip this mention
             }
 
-            // Get full post details
+            // Get full post details using the determined account's token
             const postDetails = await getInstagramPostDetails(mentionInfo.mediaId, accountInfo.token);
             mentionInfo = { ...mentionInfo, ...postDetails };
 
@@ -316,6 +364,37 @@ async function handleComment(data) {
         }
     } catch (error) {
         console.error('Error handling comment:', error);
+    }
+}
+
+// Get Instagram comment details
+async function getInstagramCommentDetails(commentId, accessToken) {
+    try {
+        console.log(`Fetching Instagram comment details for comment ID: ${commentId}`);
+        const response = await axios.get(
+            `https://graph.facebook.com/v19.0/${commentId}`,
+            {
+                params: {
+                    fields: 'id,text,username,timestamp',
+                    access_token: accessToken
+                }
+            }
+        );
+
+        console.log('Instagram comment details response:', JSON.stringify(response.data, null, 2));
+
+        return {
+            id: response.data.id,
+            text: response.data.text || '',
+            username: response.data.username || 'Unknown',
+            timestamp: response.data.timestamp
+        };
+    } catch (error) {
+        console.error('Error fetching Instagram comment details:', error.response?.data || error.message);
+        return {
+            error: 'Could not fetch comment details',
+            errorMessage: error.message
+        };
     }
 }
 

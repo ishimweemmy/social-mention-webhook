@@ -169,6 +169,88 @@ app.post('/webhook', async (req, res) => {
     }
 });
 
+app.post('/zapier/facebook-mention', async (req, res) => {
+    try {
+        console.log('Received Facebook mention from Zapier:', JSON.stringify(req.body, null, 2));
+
+        // Extract data from Zapier payload
+        const data = req.body;
+
+        // Validate required fields
+        if (!data.page_id || !data.post_id) {
+            return res.status(400).send({
+                status: 'error',
+                message: 'Missing required fields (page_id or post_id)'
+            });
+        }
+
+        // Create mention info object
+        const mentionInfo = {
+            platform: 'facebook',
+            pageId: data.page_id,
+            postId: data.post_id,
+            timestamp: data.created_time || new Date().toISOString(),
+            senderName: data.sender_name || 'Unknown',
+        };
+
+        // Get page token for API access
+        const pageToken = facebookPages[mentionInfo.pageId]?.token;
+        if (!pageToken) {
+            return res.status(404).send({
+                status: 'error',
+                message: `No token found for Facebook page ${mentionInfo.pageId}`,
+                availablePages: Object.keys(facebookPages)
+            });
+        }
+
+        // Extract post ID from the full format if needed
+        // Format could be either "pageId_postId" or just "postId"
+        const postIdParts = mentionInfo.postId.includes('_')
+            ? mentionInfo.postId.split('_')[1]
+            : mentionInfo.postId;
+
+        // Get full post details using the Facebook Graph API
+        try {
+            console.log(`Fetching details for post: ${postIdParts}`);
+            const postDetails = await getFacebookPostDetails(postIdParts, pageToken);
+
+            // Combine all information
+            Object.assign(mentionInfo, postDetails);
+
+            // Send email notification
+            await sendMentionEmail({
+                ...mentionInfo,
+                mentionedUsername: facebookPages[mentionInfo.pageId]?.name || 'your page'
+            });
+
+            // Return success response
+            res.status(200).send({
+                status: 'success',
+                message: 'Facebook mention processed successfully',
+                details: {
+                    pageId: mentionInfo.pageId,
+                    postId: postIdParts,
+                    emailSent: true
+                }
+            });
+        } catch (error) {
+            console.error('Error processing Facebook mention:', error);
+            res.status(500).send({
+                status: 'error',
+                message: 'Error processing Facebook mention',
+                error: error.message
+            });
+        }
+    } catch (error) {
+        console.error('Error in Zapier Facebook mention endpoint:', error);
+        res.status(500).send({
+            status: 'error',
+            message: 'Server error processing Facebook mention',
+            error: error.message
+        });
+    }
+});
+
 // Handle mention in post or comment
 async function handleMention(data, platform) {
     try {

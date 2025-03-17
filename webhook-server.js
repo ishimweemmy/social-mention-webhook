@@ -205,14 +205,12 @@ app.post('/zapier/facebook-mention', async (req, res) => {
 
         // Extract post ID from the full format if needed
         // Format could be either "pageId_postId" or just "postId"
-        const postIdParts = mentionInfo.postId.includes('_')
-            ? mentionInfo.postId.split('_')[1]
-            : mentionInfo.postId;
+        const fullPostId = mentionInfo.postId;  // This contains the full ID format pageId_postId
 
-        // Get full post details using the Facebook Graph API
+// Get full post details using the Facebook Graph API
         try {
-            console.log(`Fetching details for post: ${postIdParts}`);
-            const postDetails = await getFacebookPostDetails(postIdParts, pageToken);
+            console.log(`Fetching details for post: ${fullPostId}`);
+            const postDetails = await getFacebookPostDetails(fullPostId, pageToken);
 
             // Combine all information
             Object.assign(mentionInfo, postDetails);
@@ -533,9 +531,12 @@ async function getInstagramCommentDetails(commentId, accessToken) {
 }
 
 // Get Facebook post details
+// Get Facebook post details
 async function getFacebookPostDetails(postId, accessToken) {
     try {
         console.log(`Fetching Facebook post details for post ID: ${postId}`);
+
+        // Use the full ID directly since it's already in the correct format
         const response = await axios.get(
             `https://graph.facebook.com/v19.0/${postId}`,
             {

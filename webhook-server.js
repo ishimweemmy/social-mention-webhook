@@ -169,7 +169,7 @@ app.post('/webhook', async (req, res) => {
     }
 });
 
-app.post('/zapier/facebook-mention', async (req, res) => {
+app.post('/api/facebook-mention', async (req, res) => {
     try {
         console.log('Received Facebook mention from Zapier:', JSON.stringify(req.body, null, 2));
 
@@ -227,7 +227,7 @@ app.post('/zapier/facebook-mention', async (req, res) => {
                 message: 'Facebook mention processed successfully',
                 details: {
                     pageId: mentionInfo.pageId,
-                    postId: postIdParts,
+                    postId: fullPostId,
                     emailSent: true
                 }
             });
@@ -317,8 +317,6 @@ async function handleMention(data, platform) {
             await sendMentionEmail(mentionInfo);
 
         } else if (platform === 'instagram') {
-            // Instagram handling (existing code)
-            // ...
 
             // Safely extract data
             mentionInfo.mediaId = data.media_id;
